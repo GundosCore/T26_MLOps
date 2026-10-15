@@ -1,0 +1,13 @@
+# Владелец по умолчанию
+*                      @GundosCore
+
+# Документация и правила работы
+/docs/                 @snikersito
+/CONTRIBUTING.md       @snikersito
+
+# Автопроверки и тесты
+/tests/                @Chel-ovechek
+/.github/workflows/    @Chel-ovechek
+
+# Планирование и выпуск
+/docs/release-plan.md  @ekaterinagolowatenko
