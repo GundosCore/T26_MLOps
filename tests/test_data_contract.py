@@ -185,3 +185,16 @@ def test_missing_data_file_fails(tmp_path: Path) -> None:
         ]
     )
     assert code == 2
+
+
+# --- Разбиение по времени (защита от утечки) ------------------------------
+
+
+def test_report_contains_split(tmp_path: Path) -> None:
+    code, report = run(tmp_path, sample_lines())
+    split = json.loads(report.read_text(encoding="utf-8"))["split"]
+    parts = split["parts"]
+    assert code == 0
+    assert [parts[k]["rows"] for k in ("train", "validation", "test")] == [14, 5, 5]
+    assert parts["train"]["positive_rate"] == 0.571
+    assert split["time_order_ok"] is True

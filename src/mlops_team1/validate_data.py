@@ -22,6 +22,59 @@ def sha256_of(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+SPLIT_FRACTIONS = (0.6, 0.8)  # границы train/validation и validation/test
+LATE_MINUTES = 15  # опоздание: ArrDelay >= 15
+
+
+def split_summary(rows: list[dict], contract: dict) -> dict:
+    """Границы периодов, размеры, доля опоздавших и проверка порядка времени."""
+    columns = contract["columns"]
+    time_col = next(
+        (n for n, s in columns.items() if s.get("role") == "event_time"), None
+    )
+    target_col = next(
+        (n for n, s in columns.items() if s.get("role") == "target_source"), None
+    )
+    if time_col is None or target_col is None:
+        raise ContractError("contract needs roles event_time and target_source")
+    items = sorted(
+        (
+            parse_value(r[time_col], columns[time_col]),
+            parse_value(r[target_col], columns[target_col]),
+        )
+        for r in rows
+    )
+    dates = [day for day, _ in items]
+    n = len(items)
+    cuts = []
+    for fraction in SPLIT_FRACTIONS:
+        cut = int(n * fraction)
+        while 0 < cut < n and dates[cut] == dates[cut - 1]:
+            cut += 1  # не режем один день на две части
+        cuts.append(cut)
+    parts = {
+        "train": items[: cuts[0]],
+        "validation": items[cuts[0] : cuts[1]],
+        "test": items[cuts[1] :],
+    }
+    info = {}
+    for name, part in parts.items():
+        late = sum(1 for _, delay in part if delay >= LATE_MINUTES)
+        info[name] = {
+            "rows": len(part),
+            "start": part[0][0].isoformat() if part else None,
+            "end": part[-1][0].isoformat() if part else None,
+            "positive_rate": round(late / len(part), 3) if part else None,
+        }
+    ordered = all(parts.values()) and (
+        parts["train"][-1][0]
+        < parts["validation"][0][0]
+        <= parts["validation"][-1][0]
+        < parts["test"][0][0]
+    )
+    return {"parts": info, "time_order_ok": ordered}
+
+
 def load_contract(path: Path) -> dict:
     """Читает JSON-контракт; битый файл вызывает исключение."""
     with path.open(encoding="utf-8") as f:
@@ -265,6 +318,8 @@ def main(argv: list[str] | None = None) -> int:
         columns, rows = read_table(args.data)
         digest = sha256_of(args.data)
         checks = run_checks(columns, rows, contract)
+        passed = all(check["passed"] for check in checks)
+        split = split_summary(rows, contract) if passed else None
         report_head = {
             "contract_version": contract["contract_version"],
             "dataset": contract["dataset"],
@@ -275,7 +330,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
-    passed = all(check["passed"] for check in checks)
     report = {
         **report_head,
         "data_file": args.data.as_posix(),
@@ -284,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         "columns": columns,
         "passed": passed,
         "checks": checks,
+        "split": split,
     }
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(
