@@ -1,0 +1,42 @@
+ЛР5, отрицательный сценарий (команда 1)
+Платформа: Windows 11, PowerShell, окружение .venv, DVC установлен
+
+Дефект: из bundle убрано поле version (src/mlops_team1/train.py, удалена строка "version": "0.2.0")
+Команда: python -m pytest -q "tests/test_pipeline_smoke.py::test_validate_train_load_predict_chain"
+Упавший тест: tests/test_pipeline_smoke.py::test_validate_train_load_predict_chain
+Слой отказа: load (validate и train прошли, load_bundle отказал)
+Причина: ValueError: В файле модели (словарь) нет ключей: version
+Результат: 1 failed in 1.80s
+
+Фрагмент вывода pytest (строки с временными путями и содержимым таблицы данных опущены):
+
+    # Слой load: файл читается и содержит версию формата.
+>       bundle = load_bundle(model_path)
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_pipeline_smoke.py:30:
+
+    def load_bundle(path: Path) -> dict:
+        ...
+        present = set(bundle) if isinstance(bundle, dict) else set()
+        missing = [key for key in REQUIRED_KEYS if key not in present]
+        if missing:
+            kind = "словарь" if isinstance(bundle, dict) else type(bundle).__name__
+>           raise ValueError(f"В файле модели ({kind}) нет ключей: {', '.join(missing)}")
+E           ValueError: В файле модели (словарь) нет ключей: version
+
+src\mlops_team1\model_io.py:44: ValueError
+FAILED tests/test_pipeline_smoke.py::test_validate_train_load_predict_chain - ValueError: В файле модели (словарь) нет ключей: version
+
+Весь набор с тем же дефектом (python -m pytest -q): 7 failed, 79 passed in 24.34s
+Упали:
+  tests/test_fixtures.py::test_trained_model_path_gives_loadable_bundle
+  tests/test_model_io.py::test_load_bundle_returns_all_required_keys
+  tests/test_model_io.py::test_predict_proba_row_returns_probability
+  tests/test_model_io.py::test_main_prints_probability_for_local_file
+  tests/test_pipeline_smoke.py::test_validate_train_load_predict_chain
+  tests/test_pipeline_smoke.py::test_cli_reports_same_version_and_probability_as_bundle
+  tests/test_train_model.py::test_train_creates_versioned_bundle
+
+Диагностика слоя: в smoke-тесте проверки слоёв validate и train выполнены (файл модели создан), падение на шаге load. Соседние тесты (model_io, fixtures, train_model) падают из-за той же причины, а test_load_bundle_returns_all_required_keys называет её напрямую: в bundle нет ключа version.
+Дефект снят командой git restore src/mlops_team1/train.py и в коммит не входит.
