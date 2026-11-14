@@ -26,7 +26,17 @@ REQUIRED_KEYS = (
 
 def load_bundle(path: Path) -> dict:
     """Читает файл модели joblib и проверяет, что в нём есть все обязательные ключи."""
-    bundle = joblib.load(path)
+    try:
+        bundle = joblib.load(path)
+    except OSError:
+        raise
+    except Exception as exc:
+        # На повреждённом файле joblib и pickle бросают разные исключения (KeyError, EOFError,
+        # ValueError), поэтому приводим их к одному контролируемому ValueError.
+        raise ValueError(
+            f"Файл модели повреждён или не является файлом joblib: {Path(path).name} "
+            f"({type(exc).__name__})"
+        ) from exc
     present = set(bundle) if isinstance(bundle, dict) else set()
     missing = [key for key in REQUIRED_KEYS if key not in present]
     if missing:

@@ -56,3 +56,33 @@ def test_main_prints_probability_for_local_file(
 
 def test_main_returns_2_for_missing_file(tmp_path: Path) -> None:
     assert main(["--path", str(tmp_path / "missing.joblib")]) == 2
+
+
+CORRUPTIONS = [
+    pytest.param(lambda raw: b"not a joblib file", id="garbage-bytes"),
+    pytest.param(lambda raw: b"", id="empty-file"),
+    pytest.param(lambda raw: raw[: len(raw) // 2], id="truncated-file"),
+]
+
+
+@pytest.mark.parametrize("corrupt", CORRUPTIONS)
+def test_load_bundle_rejects_corrupted_file(
+    model: Path, tmp_path: Path, corrupt
+) -> None:
+    broken = tmp_path / "broken.joblib"
+    broken.write_bytes(corrupt(model.read_bytes()))
+    with pytest.raises(ValueError, match="повреждён"):
+        load_bundle(broken)
+
+
+@pytest.mark.parametrize("corrupt", CORRUPTIONS)
+def test_main_returns_2_without_traceback_for_corrupted_file(
+    model: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], corrupt
+) -> None:
+    broken = tmp_path / "broken.joblib"
+    broken.write_bytes(corrupt(model.read_bytes()))
+    code = main(["--path", str(broken)])
+    error = capsys.readouterr().err
+    assert code == 2
+    assert error.startswith("ERROR: ValueError")
+    assert "Traceback" not in error
