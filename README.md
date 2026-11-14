@@ -88,9 +88,11 @@ python -m mlops_team1.validate_data --data data/flights_sample.csv --contract da
 3. Распакуйте архив `dvc-storage` **рядом** с клоном: папка `dvc-storage` должна лежать на одном уровне с папкой репозитория, не внутри неё.
 4. Выполните `dvc pull`. Ожидаемо: `1 file fetched and 1 file added`.
 5. Запустите валидатор:
+
    ```bash
    python -m mlops_team1.validate_data --data data/flights_sample.csv --contract data/contract.json --report reports/validation/restored.json
    ```
+
    Код завершения 0, все проверки `OK`. Этот отчёт временный и в Git не попадает.
 6. Сверьте SHA-256 файла `data/flights_sample.csv`. В `main` лежит версия v2, поэтому ожидается `bf35cf01db04fb31de810dc16009d643e6bf3be22c791faea7c00fdbc25cff08` (780 байт, в `data/flights_sample.csv.dvc` стоит `md5: 12e7b5a02885ff28f6560bd895a1330e`). Как получить версию v1, описано ниже.
    - PowerShell: `Get-FileHash data\flights_sample.csv -Algorithm SHA256`
@@ -112,7 +114,7 @@ dvc pull
 Идентификаторы версий (три разных хеша, ни один не заменяет остальные):
 
 | Версия | Git commit | DVC hash (md5) | SHA-256 CSV | Размер |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | v1 | `a27bc82bb036f1cdb42153757e5abc217ecaa94c` | `b41ffd893842f7038a7004b9eb1e6628` | `d2038bfd4ba28a304e1bed26578c9bfcb556942b51694b8342a75f4f2dbf617e` | 482 байта |
 | v2 | `c0224cb1b2537c5f1d0f952957adc20ac153acba` | `12e7b5a02885ff28f6560bd895a1330e` | `bf35cf01db04fb31de810dc16009d643e6bf3be22c791faea7c00fdbc25cff08` | 780 байт |
 
@@ -157,11 +159,32 @@ python -m pip install -e ".[dev,tracking]"
 - **MLflow-сервер.** Запускается из папки вне репозитория, чтобы база и артефакты не попали в Git.
 - **Имя experiment.** `mlops-tmo41-team1-flight-delay`; слаг группы `tmo41` — предположение тимлида.
 
+## Тесты (ЛР5)
+
+```powershell
+python -m pytest -q                                          # весь набор
+python -m pytest -q -m data                                  # один слой: data, evaluation, model, api, pipeline, project
+python -m pytest -q --junitxml=reports/tests/lr5-pass.xml    # положительный отчёт JUnit XML
+```
+
+Слои задаются по имени файла в `tests/conftest.py`. Таблица «риск — тест — ожидаемый отказ», слои и места, где тесты могут дать ложную уверенность, описаны в [docs/testing/lr5-risk-table.md](docs/testing/lr5-risk-table.md). Отчёт `reports/tests/lr5-pass.xml` снят с установленным DVC (все тесты выполнены); в CI DVC нет, поэтому там один тест пропускается.
+
+## Отклонения от задания (ЛР5)
+
+- **Имя пакета и установка.** `mlops_team1` вместо `mlops_flight_delay`, зависимости ставятся как `.[dev,tracking]`, ветки называются `<тип>/issue-<номер>-<название>`.
+- **Данные для тестов.** Fixture `valid_frame` читает `tests/fixtures/flights_sample_v1.csv`, а не `data/flights_sample.csv`: рабочий CSV лежит под DVC и в CI его нет.
+- **Имена проверок валидатора.** Тесты используют имена проверок нашего валидатора (`ranges`, `types`, `allowed_values` и другие), а не имена из примера в задании (`DepHour.maximum` и т. п.).
+- **Слой API.** HTTP API в проекте пока нет (он появится в ЛР6–ЛР7). Слой `api` закрыт тестами интерфейса предсказания `model_io` (функции и командная строка), а строка таблицы рисков про API помечена как замена.
+- **Слои тестов.** Слой задаётся маркером по имени файла в `tests/conftest.py`; файлы не разложены по папкам, чтобы не ломать пути к эталонным данным и не раздувать diff.
+- **Роли.** В команде четыре человека, поэтому роли Integration engineer и Quality reviewer совмещены.
+- **Defect injection.** Каждый участник внёс свой дефект из списка задания (порог цели, порядок признаков, поле версии bundle, граница `DepHour`). Дефект «удалить проверку одного класса» не использовался: его и так ловит `tests/test_evaluate.py`.
+- **Исправление по итогам тестов.** Анализ риска «модельный файл повреждён» показал, что `load_bundle` на мусорном или пустом файле падал сырым `KeyError` или `EOFError`, а командная строка печатала трассировку. Теперь это контролируемый `ValueError`, у командной строки код 2.
+
 ## Структура
 
 - `src/mlops_team1/` — код проекта
 - `tests/` — тесты
 - `.github/workflows/ci.yml` — автоматические проверки (CI)
 - `data/` — контракт и `.dvc`-метаданные набора; сами CSV в Git не добавляются, их версионирует DVC (см. `.gitignore`)
-- `reports/` — отчёты проверок (создаются командой, в Git не хранятся)
-- `docs/` — документация, в том числе `docs/reproducibility/` с протоколом и отчётами версий данных
+- `reports/` — отчёты проверок (создаются командой, в Git не хранятся, кроме `reports/experiments/` и `reports/tests/`)
+- `docs/` — документация, в том числе `docs/reproducibility/` с протоколом и отчётами версий данных и `docs/testing/` с таблицей рисков тестов (ЛР5)
