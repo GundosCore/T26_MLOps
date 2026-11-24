@@ -12,7 +12,11 @@
 
 Критерий приёмки: quality gate блокирует некорректную сборку; итоговый контейнер healthy, работает как 10001:10001, ограничивает запись и capabilities, runtime не содержит tests, данных, .git, .env и dev-инструментов.
 
-## Артефакт
+## Командная версия ЛР6
+
+Аннотированный тег `lr6-v1` указывает на коммит `f2b320f5dacd32a8025333fa04f361e08ccf69ba`. Командный образ `mlops-flight-delay:lr6-98c7a6f` собран из коммита `98c7a6f`. Его Image ID — `sha256:9b1c2fff98a9c514b0788ba79bfae11f8e9cf8e9df7019c76fb271d0584901dc`. [Тег ЛР6](https://github.com/GundosCore/T26_MLOps/releases/tag/lr6-v1) · [Вывод docker image inspect](https://github.com/GundosCore/T26_MLOps/blob/main/reports/container/lr6-inspect.txt)
+
+## Личный артефакт
 Образ: mlops-flight-delay:lr6-9033aa1.
 Коммит: 9033aa1045b26c63d5affc83518972721d97c57d.
 Image ID: sha256:6ae39f09bb7aee95e85233eb662980ce7ac0f5cba572af9dca7d17bbdec2ac96.
@@ -22,6 +26,9 @@ Image ID: sha256:6ae39f09bb7aee95e85233eb662980ce7ac0f5cba572af9dca7d17bbdec2ac9
 Зависимости ограничены диапазонами pyproject.toml, lock-файла нет: тег SHA связывает образ с кодом, но не гарантирует побайтовое повторение будущей сборки.
 
 ## Проверки и результаты
+
+Результаты pytest ниже получены на коммите `9033aa1` из PR #85.
+
 - python -m ruff check .: All checks passed!
 - python -m pytest -q: 130 passed, 1 skipped; DVC-проверка пропущена.
 - python -m pytest -q -m api: 29 passed.
@@ -66,7 +73,7 @@ COPY --from=quality связывает runtime с успешным заверш�
 ## Доказательства
 На ноутбуке: ~/T26_MLOps-lr6/reports/container/.
 Файлы: lr6-inspect.txt, lr6-container-inspect.json, lr6-history.txt, lr6-app.log, lr6-build-fixed.log, lr6-final-build.log, lr6-cache.log, lr6-cache-readme-verified.log, lr6-defect.log.
-Отчёты не входят в PR реализации: по договорённости там только три файла. Для публикации отчётов в Git требуется отдельное изменение правил reports/ тимлидом.
+В `.gitignore` предусмотрено исключение `!reports/container/`. Командные отчёты опубликованы в `main`: [параметры образа](https://github.com/GundosCore/T26_MLOps/blob/main/reports/container/lr6-inspect.txt) и [результат HTTP smoke](https://github.com/GundosCore/T26_MLOps/blob/main/reports/container/lr6-smoke.json). Подробные журналы личной сборки и опытов сохранены локально.
 
 ## Использование ИИ и самостоятельная работа
 Использован Codex (OpenAI). Екатерина самостоятельно выполнила установку Docker, проверки version/Compose/hello-world, создание ветки/worktree, исходный pytest (130 passed, 1 skipped), создание файлов и первую сборку; её выводы приведены в переписке. Она также опубликовала review PR #84 с помощью подготовленного текста.
